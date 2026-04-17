@@ -12,17 +12,25 @@
 
 ## 安装方式
 
-### 方式 1：从本地目录安装
+### 方式 1：在项目中直接添加依赖
+
+```bash
+cd /workspace/backend
+uv add chromadb>=0.5.0
+```
+
+### 方式 2：从本地目录安装（开发模式）
 
 ```bash
 cd /workspace/extensions/chromadb
-pip install -e .
+uv pip install -e .
 ```
 
-### 方式 2：直接安装 ChromaDB
+### 方式 3：使用 uv pip 直接安装
 
 ```bash
-pip install chromadb>=0.5.0
+cd /workspace/backend
+uv pip install chromadb>=0.5.0
 ```
 
 ## 配置使用
@@ -141,19 +149,18 @@ new_storage.save(memory_data)
 
 ## 故障排查
 
-### ImportError: No module named 'deerflow_chromadb'
-
-解决：安装扩展
-```bash
-cd /workspace/extensions/chromadb
-pip install -e .
-```
-
 ### ImportError: No module named 'chromadb'
 
 解决：安装 ChromaDB
 ```bash
-pip install chromadb>=0.5.0
+cd /workspace/backend
+uv add chromadb>=0.5.0
+```
+
+或者使用 uv pip：
+```bash
+cd /workspace/backend
+uv pip install chromadb>=0.5.0
 ```
 
 ### 连接远程 ChromaDB 失败
