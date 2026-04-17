@@ -106,15 +106,115 @@ facts = storage.search_facts(
 print(f"找到 {len(facts)} 条相关事实")
 ```
 
+### 业务数据管理
+
+存储和管理业务术语，让 agent 理解业务领域知识：
+
+```python
+from chromadb import ChromaMemoryStorage, BusinessDataManager
+
+# 初始化存储
+storage = ChromaMemoryStorage()
+
+# 获取 ChromaDB 客户端
+client = storage._client
+
+# 初始化业务数据管理器
+business_manager = BusinessDataManager(client)
+
+# 存储业务术语
+business_terms = [
+    {
+        "term": "用户留存率",
+        "definition": "用户在特定时间段内继续使用产品或服务的比例",
+        "examples": ["我们的月留存率达到了 60%", "用户留存率是衡量产品粘性的重要指标"],
+        "category": "metrics"
+    },
+    {
+        "term": "转化率",
+        "definition": "访问者完成目标操作的比例",
+        "examples": ["我们的注册转化率为 25%", "优化着陆页可以提高转化率"],
+        "category": "metrics"
+    }
+]
+
+business_manager.store_business_terms(business_terms, namespace="marketing")
+
+# 存储业务文档
+business_documents = [
+    {
+        "title": "2024 年营销战略",
+        "content": "我们的 2024 年营销战略将聚焦于提高用户留存率和转化率。",
+        "tags": ["marketing", "strategy"],
+        "source": "营销部门"
+    }
+]
+
+business_manager.store_business_documents(business_documents, namespace="marketing")
+
+# 搜索业务术语
+terms = business_manager.search_business_terms(
+    query="如何提高用户留存率？",
+    namespace="marketing"
+)
+print("相关业务术语:", terms)
+```
+
+### 意图识别（业务术语感知）
+
+使用业务术语进行智能意图识别：
+
+```python
+from chromadb import ChromaMemoryStorage, IntentRecognitionTool
+
+# 初始化
+storage = ChromaMemoryStorage()
+intent_tool = IntentRecognitionTool(storage)
+
+# 存储业务数据（如果尚未存储）
+# 见上面的业务数据管理示例
+
+# 识别意图
+result = intent_tool.recognize_intent(
+    "如何提高用户留存率？",
+    namespace="marketing"
+)
+
+print("识别结果:")
+print(f"意图: {result['intent']}")
+print(f"置信度: {result['confidence']}")
+print(f"业务术语: {result['key_business_terms']}")
+
+# 增强提示（用于 agent 上下文）
+enhanced_prompt = intent_tool.enhance_prompt(
+    "如何提高用户留存率？",
+    namespace="marketing"
+)
+print("\n增强提示:")
+print(enhanced_prompt)
+```
+
+### 完整示例
+
+运行完整的使用示例：
+
+```bash
+cd /workspace/extensions/chromadb
+python -m chromadb.example_usage
+```
+
 ## 目录结构
 
 ```
 extensions/chromadb/
-├── deerflow_chromadb/        # 包目录
-│   ├── __init__.py          # 模块入口
-│   └── storage.py           # ChromaMemoryStorage 实现
-├── setup.py                 # 安装配置
-└── README.md                # 本文档
+├── chromadb/              # 包目录
+│   ├── __init__.py        # 模块入口
+│   ├── storage.py         # ChromaMemoryStorage 实现
+│   ├── business_data.py   # 业务数据管理
+│   ├── intent_recognition.py # 意图识别
+│   └── example_usage.py   # 使用示例
+├── setup.py               # 安装配置
+└── README.md              # 本文档
 ```
 
 ## 工作原理
