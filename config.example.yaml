@@ -701,7 +701,17 @@ summarization:
 # Stores user context and conversation history for personalized responses
 memory:
   enabled: true
-  storage_path: memory.json # Path relative to backend directory
+  # Storage class options:
+  # - File-based (default): deerflow.agents.memory.storage.FileMemoryStorage
+  # - ChromaDB (requires chromadb>=0.5.0): deerflow.community.chromadb:ChromaMemoryStorage
+  #
+  # To use ChromaDB:
+  # 1. Install: cd backend && uv pip install 'deerflow-harness[chromadb]'
+  # 2. Uncomment storage_class below
+  # 3. Optional: Set CHROMADB_PERSIST_DIR, CHROMADB_HOST, CHROMADB_PORT env vars
+  #
+  # storage_class: deerflow.community.chromadb:ChromaMemoryStorage
+  storage_path: memory.json # Path relative to backend directory (FileMemoryStorage only)
   debounce_seconds: 30 # Wait time before processing queued updates
   model_name: null # Use default model
   max_facts: 100 # Maximum number of facts to store
