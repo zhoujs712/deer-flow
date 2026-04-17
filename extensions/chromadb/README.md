@@ -198,23 +198,37 @@ print(enhanced_prompt)
 
 运行完整的使用示例：
 
+**方式 1：使用 backend 目录中的示例脚本（推荐）**
+
+```bash
+cd /workspace/backend
+uv run python chromadb_example.py
+```
+
+**方式 2：从 extensions 目录运行**
+
 ```bash
 cd /workspace/extensions/chromadb
-python -m chromadb.example_usage
+# 添加当前目录到 Python 路径并运行
+PYTHONPATH=$(pwd) uv run python -m deerflow_chromadb.example_usage
 ```
+
+**注意：** ChromaDB 会在首次运行时下载 ONNX 模型（约 80MB），这可能需要一些时间，取决于网络连接速度。
 
 ## 目录结构
 
 ```
 extensions/chromadb/
-├── chromadb/              # 包目录
-│   ├── __init__.py        # 模块入口
-│   ├── storage.py         # ChromaMemoryStorage 实现
-│   ├── business_data.py   # 业务数据管理
+├── deerflow_chromadb/      # 包目录
+│   ├── __init__.py         # 模块入口
+│   ├── storage.py          # ChromaMemoryStorage 实现
+│   ├── business_data.py    # 业务数据管理
 │   ├── intent_recognition.py # 意图识别
-│   └── example_usage.py   # 使用示例
-├── setup.py               # 安装配置
-└── README.md              # 本文档
+│   └── example_usage.py    # 使用示例
+├── backend/                # 示例脚本（在 backend 目录中）
+│   └── chromadb_example.py # 简化的示例脚本
+├── setup.py                # 安装配置
+└── README.md               # 本文档
 ```
 
 ## 工作原理

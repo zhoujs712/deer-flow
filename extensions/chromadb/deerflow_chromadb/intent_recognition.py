@@ -3,8 +3,8 @@
 import logging
 from typing import Dict, List, Optional, Any
 
-from chromadb.storage import ChromaMemoryStorage
-from chromadb.business_data import BusinessDataManager
+from deerflow_chromadb.storage import ChromaMemoryStorage
+from deerflow_chromadb.business_data import BusinessDataManager
 
 logger = logging.getLogger(__name__)
 
