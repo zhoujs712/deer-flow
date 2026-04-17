@@ -1,46 +1,49 @@
-"""Business data management for ChromaDB integration."""
+"""业务数据管理 - 用于 ChromaDB 集成"""
 
 import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from .config import get_config
+
 logger = logging.getLogger(__name__)
 
 
 class BusinessDataManager:
-    """Manager for business data storage and retrieval in ChromaDB."""
+    """业务数据管理器 - 用于在 ChromaDB 中存储和检索业务数据"""
 
     def __init__(self, chroma_client):
-        """Initialize the business data manager.
+        """初始化业务数据管理器
 
         Args:
-            chroma_client: ChromaDB client instance
+            chroma_client: ChromaDB 客户端实例
         """
         self._client = chroma_client
         self._collection = self._client.get_or_create_collection(
             name="business_terms",
             metadata={"purpose": "business terminology and domain knowledge"}
         )
+        self._config = get_config()
 
     def store_business_terms(
         self,
         terms: List[Dict[str, Any]],
         namespace: str = "default"
     ) -> bool:
-        """Store business terms in ChromaDB.
+        """在 ChromaDB 中存储业务术语
 
         Args:
-            terms: List of business terms with definitions
-            namespace: Namespace for organizing terms
+            terms: 业务术语列表，包含定义
+            namespace: 用于组织术语的命名空间
 
-        Each term should have:
-            - term: str - The business term
-            - definition: str - The definition
-            - examples: List[str] - Example usage (optional)
-            - category: str - Category (optional)
+        每个术语应包含：
+            - term: str - 业务术语
+            - definition: str - 定义
+            - examples: List[str] - 使用示例（可选）
+            - category: str - 类别（可选）
 
         Returns:
-            bool: Success status
+            bool: 成功状态
         """
         try:
             documents = []
@@ -54,10 +57,10 @@ class BusinessDataManager:
                 category = term_data.get("category", "general")
 
                 if not term or not definition:
-                    logger.warning(f"Skipping term without term or definition: {term_data}")
+                    logger.warning(f"跳过缺少术语或定义的条目: {term_data}")
                     continue
 
-                # Create document content
+                # 创建文档内容
                 content_parts = [f"Term: {term}", f"Definition: {definition}"]
                 if examples:
                     content_parts.append(f"Examples: {', '.join(examples)}")
@@ -80,12 +83,12 @@ class BusinessDataManager:
                     metadatas=metadatas,
                     ids=ids
                 )
-                logger.info(f"Stored {len(documents)} business terms in namespace '{namespace}'")
+                logger.info(f"已存储 {len(documents)} 个业务术语到命名空间 '{namespace}'")
                 return True
             return False
 
         except Exception as e:
-            logger.error("Failed to store business terms: %s", e, exc_info=True)
+            logger.error("存储业务术语失败: %s", e, exc_info=True)
             return False
 
     def store_business_documents(
@@ -93,20 +96,20 @@ class BusinessDataManager:
         documents: List[Dict[str, Any]],
         namespace: str = "default"
     ) -> bool:
-        """Store business documents in ChromaDB.
+        """在 ChromaDB 中存储业务文档
 
         Args:
-            documents: List of business documents
-            namespace: Namespace for organizing documents
+            documents: 业务文档列表
+            namespace: 用于组织文档的命名空间
 
-        Each document should have:
-            - title: str - Document title
-            - content: str - Document content
-            - tags: List[str] - Tags (optional)
-            - source: str - Source (optional)
+        每个文档应包含：
+            - title: str - 文档标题
+            - content: str - 文档内容
+            - tags: List[str] - 标签（可选）
+            - source: str - 来源（可选）
 
         Returns:
-            bool: Success status
+            bool: 成功状态
         """
         try:
             doc_contents = []
@@ -120,7 +123,7 @@ class BusinessDataManager:
                 source = doc.get("source", "unknown")
 
                 if not title or not content:
-                    logger.warning(f"Skipping document without title or content: {doc}")
+                    logger.warning(f"跳过缺少标题或内容的文档: {doc}")
                     continue
 
                 doc_content = f"Title: {title}\nContent: {content}"
@@ -145,12 +148,12 @@ class BusinessDataManager:
                     metadatas=metadatas,
                     ids=ids
                 )
-                logger.info(f"Stored {len(doc_contents)} business documents in namespace '{namespace}'")
+                logger.info(f"已存储 {len(doc_contents)} 个业务文档到命名空间 '{namespace}'")
                 return True
             return False
 
         except Exception as e:
-            logger.error("Failed to store business documents: %s", e, exc_info=True)
+            logger.error("存储业务文档失败: %s", e, exc_info=True)
             return False
 
     def search_business_terms(
@@ -160,18 +163,23 @@ class BusinessDataManager:
         top_k: int = 5,
         category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Search for business terms related to a query.
+        """搜索与查询相关的业务术语
 
         Args:
-            query: Search query
-            namespace: Optional namespace filter
-            top_k: Maximum number of results
-            category: Optional category filter
+            query: 搜索查询
+            namespace: 可选的命名空间过滤器
+            top_k: 最大结果数
+            category: 可选的类别过滤器
 
         Returns:
-            List of matching business terms
+            匹配的业务术语列表
         """
         try:
+            # 使用配置管理模块的默认值
+            intent_config = self._config.get_intent_recognition_config()
+            if top_k <= 0:
+                top_k = intent_config["top_k"]
+
             where = {"type": "business_term"}
             if namespace:
                 where["namespace"] = namespace
@@ -189,7 +197,7 @@ class BusinessDataManager:
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i]
                 
-                # Parse the document content
+                # 解析文档内容
                 term_info = {}
                 lines = doc.split('\n')
                 for line in lines:
@@ -203,13 +211,13 @@ class BusinessDataManager:
                         term_info["category"] = line[10:].strip()
                 
                 term_info["metadata"] = metadata
-                term_info["similarity"] = 1.0 - distance  # Convert distance to similarity
+                term_info["similarity"] = 1.0 - distance  # 将距离转换为相似度
                 matched_terms.append(term_info)
 
             return matched_terms
 
         except Exception as e:
-            logger.error("Failed to search business terms: %s", e, exc_info=True)
+            logger.error("搜索业务术语失败: %s", e, exc_info=True)
             return []
 
     def search_business_documents(
@@ -219,16 +227,16 @@ class BusinessDataManager:
         top_k: int = 3,
         tags: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
-        """Search for business documents related to a query.
+        """搜索与查询相关的业务文档
 
         Args:
-            query: Search query
-            namespace: Optional namespace filter
-            top_k: Maximum number of results
-            tags: Optional tag filters
+            query: 搜索查询
+            namespace: 可选的命名空间过滤器
+            top_k: 最大结果数
+            tags: 可选的标签过滤器
 
         Returns:
-            List of matching business documents
+            匹配的业务文档列表
         """
         try:
             where = {"type": "business_document"}
@@ -246,7 +254,7 @@ class BusinessDataManager:
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i]
                 
-                # Filter by tags if specified
+                # 如果指定了标签，进行过滤
                 if tags and "tags" in metadata:
                     doc_tags = metadata["tags"]
                     if not any(tag in doc_tags for tag in tags):
@@ -264,17 +272,17 @@ class BusinessDataManager:
             return matched_docs
 
         except Exception as e:
-            logger.error("Failed to search business documents: %s", e, exc_info=True)
+            logger.error("搜索业务文档失败: %s", e, exc_info=True)
             return []
 
     def get_all_terms(self, namespace: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get all business terms.
+        """获取所有业务术语
 
         Args:
-            namespace: Optional namespace filter
+            namespace: 可选的命名空间过滤器
 
         Returns:
-            List of all business terms
+            所有业务术语列表
         """
         try:
             where = {"type": "business_term"}
@@ -294,17 +302,17 @@ class BusinessDataManager:
             return terms
 
         except Exception as e:
-            logger.error("Failed to get all terms: %s", e, exc_info=True)
+            logger.error("获取所有术语失败: %s", e, exc_info=True)
             return []
 
     def clear_namespace(self, namespace: str) -> bool:
-        """Clear all data in a namespace.
+        """清除命名空间中的所有数据
 
         Args:
-            namespace: Namespace to clear
+            namespace: 要清除的命名空间
 
         Returns:
-            bool: Success status
+            bool: 成功状态
         """
         try:
             results = self._collection.get(
@@ -313,9 +321,9 @@ class BusinessDataManager:
 
             if results["ids"]:
                 self._collection.delete(ids=results["ids"])
-                logger.info(f"Cleared {len(results['ids'])} items from namespace '{namespace}'")
+                logger.info(f"已清除命名空间 '{namespace}' 中的 {len(results['ids'])} 个项目")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to clear namespace '{namespace}': %s", e, exc_info=True)
+            logger.error(f"清除命名空间 '{namespace}' 失败: %s", e, exc_info=True)
             return False

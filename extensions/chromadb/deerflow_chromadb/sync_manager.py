@@ -1,4 +1,4 @@
-"""Sync manager for dictionary data updates."""
+"""同步管理器 - 用于字典数据更新"""
 
 import logging
 import threading
@@ -7,178 +7,206 @@ from typing import Dict, List, Optional, Any
 
 from .sql_server import SQLServerExtractor
 from .business_data import BusinessDataManager
+from .config import get_config
 
 logger = logging.getLogger(__name__)
 
 
 class SyncManager:
-    """Manager for synchronizing dictionary data from SQL Server to ChromaDB."""
+    """同步管理器 - 用于从 SQL Server 同步字典数据到 ChromaDB"""
 
     def __init__(self, chroma_client):
-        """Initialize the sync manager.
+        """初始化同步管理器
 
         Args:
-            chroma_client: ChromaDB client instance
+            chroma_client: ChromaDB 客户端实例
         """
         self._chroma_client = chroma_client
         self._business_data_manager = BusinessDataManager(chroma_client)
         self._sql_extractor = SQLServerExtractor()
         self._sync_thread = None
         self._running = False
-        self._interval_seconds = 3600  # Default: 1 hour
+        self._interval_seconds = 3600  # 默认：1小时
+        self._tables_config = []
+        self._namespace = "sql_server_dictionary"
 
     def configure_sync(
         self,
         tables_config: List[Dict[str, Any]],
         connection_string: Optional[str] = None,
-        interval_seconds: int = 3600
+        interval_seconds: Optional[int] = None,
+        namespace: Optional[str] = None
     ) -> bool:
-        """Configure the synchronization settings.
+        """配置同步设置
 
         Args:
-            tables_config: List of table configurations
-            connection_string: SQL Server connection string
-            interval_seconds: Sync interval in seconds
+            tables_config: 表配置列表
+            connection_string: SQL Server 连接字符串
+            interval_seconds: 同步间隔（秒）
+            namespace: 存储命名空间
 
         Returns:
-            bool: Success status
+            bool: 配置成功状态
         """
         self._tables_config = tables_config
-        self._interval_seconds = interval_seconds
+        
+        # 使用配置管理模块的默认值
+        config = get_config()
+        sync_config = config.get_sync_config()
+        
+        self._interval_seconds = interval_seconds or sync_config["interval_seconds"]
+        self._namespace = namespace or sync_config["namespace"]
 
-        # Connect to SQL Server
+        # 连接到 SQL Server
         if connection_string:
             connected = self._sql_extractor.connect(connection_string)
         else:
-            connected = self._sql_extractor.connect_from_env()
+            # 尝试从配置获取连接字符串
+            conn_str = config.get_sql_server_connection_string()
+            if conn_str:
+                connected = self._sql_extractor.connect(conn_str)
+            else:
+                connected = self._sql_extractor.connect_from_env()
 
         if not connected:
-            logger.error("Failed to connect to SQL Server for sync")
+            logger.error("同步服务连接 SQL Server 失败")
             return False
 
+        logger.info(f"同步服务配置成功，间隔: {self._interval_seconds}秒，命名空间: {self._namespace}")
         return True
 
     def start_sync(self) -> bool:
-        """Start the synchronization service.
+        """启动同步服务
 
         Returns:
-            bool: Success status
+            bool: 启动成功状态
         """
         if self._running:
-            logger.warning("Sync service is already running")
+            logger.warning("同步服务已经在运行")
             return True
+
+        if not self._tables_config:
+            logger.error("未配置同步表，启动失败")
+            return False
 
         try:
             self._running = True
             self._sync_thread = threading.Thread(target=self._sync_loop, daemon=True)
             self._sync_thread.start()
-            logger.info(f"Started sync service with interval {self._interval_seconds} seconds")
+            logger.info(f"同步服务已启动，间隔: {self._interval_seconds}秒")
             return True
         except Exception as e:
-            logger.error("Failed to start sync service: %s", e, exc_info=True)
+            logger.error("启动同步服务失败: %s", e, exc_info=True)
             self._running = False
             return False
 
     def stop_sync(self) -> bool:
-        """Stop the synchronization service.
+        """停止同步服务
 
         Returns:
-            bool: Success status
+            bool: 停止成功状态
         """
         if not self._running:
-            logger.warning("Sync service is not running")
+            logger.warning("同步服务未运行")
             return True
 
         try:
             self._running = False
             if self._sync_thread:
                 self._sync_thread.join(timeout=5)
-            logger.info("Stopped sync service")
+            logger.info("同步服务已停止")
             return True
         except Exception as e:
-            logger.error("Failed to stop sync service: %s", e, exc_info=True)
+            logger.error("停止同步服务失败: %s", e, exc_info=True)
             return False
 
     def sync_now(self) -> bool:
-        """Manually trigger a synchronization.
+        """手动触发同步
 
         Returns:
-            bool: Success status
+            bool: 同步成功状态
         """
         return self._perform_sync()
 
     def _sync_loop(self):
-        """Synchronization loop."""
+        """同步循环"""
         while self._running:
             try:
                 self._perform_sync()
             except Exception as e:
-                logger.error("Error in sync loop: %s", e, exc_info=True)
+                logger.error("同步循环错误: %s", e, exc_info=True)
             
-            # Wait for the next interval
+            # 等待下一个间隔
             for _ in range(self._interval_seconds):
                 if not self._running:
                     break
                 time.sleep(1)
 
     def _perform_sync(self) -> bool:
-        """Perform synchronization from SQL Server to ChromaDB.
+        """执行从 SQL Server 到 ChromaDB 的同步
 
         Returns:
-            bool: Success status
+            bool: 同步成功状态
         """
         try:
-            logger.info("Starting synchronization from SQL Server to ChromaDB")
+            logger.info("开始从 SQL Server 同步到 ChromaDB")
 
-            # Extract terms from SQL Server
+            # 从 SQL Server 提取术语
             terms = self._sql_extractor.extract_multiple_tables(self._tables_config)
             
             if not terms:
-                logger.warning("No terms extracted from SQL Server")
+                logger.warning("未从 SQL Server 提取到术语")
                 return False
 
-            # Store terms in ChromaDB
-            # Use a dedicated namespace for SQL Server dictionary data
+            # 存储术语到 ChromaDB
             success = self._business_data_manager.store_business_terms(
                 terms=terms,
-                namespace="sql_server_dictionary"
+                namespace=self._namespace
             )
 
             if success:
-                logger.info(f"Successfully synchronized {len(terms)} terms from SQL Server")
+                logger.info(f"成功同步 {len(terms)} 个术语到 ChromaDB")
             else:
-                logger.error("Failed to store terms in ChromaDB")
+                logger.error("存储术语到 ChromaDB 失败")
 
             return success
 
         except Exception as e:
-            logger.error("Failed to perform sync: %s", e, exc_info=True)
+            logger.error("执行同步失败: %s", e, exc_info=True)
             return False
 
     def is_running(self) -> bool:
-        """Check if the sync service is running.
+        """检查同步服务是否运行
 
         Returns:
-            bool: Running status
+            bool: 运行状态
         """
         return self._running
 
     def get_sync_interval(self) -> int:
-        """Get the current sync interval in seconds.
+        """获取当前同步间隔（秒）
 
         Returns:
-            int: Sync interval in seconds
+            int: 同步间隔（秒）
         """
         return self._interval_seconds
 
+    def get_namespace(self) -> str:
+        """获取当前存储命名空间
+
+        Returns:
+            str: 命名空间
+        """
+        return self._namespace
+
 
 def get_sync_manager(chroma_client) -> SyncManager:
-    """Get a sync manager instance.
+    """获取同步管理器实例
 
     Args:
-        chroma_client: ChromaDB client instance
+        chroma_client: ChromaDB 客户端实例
 
     Returns:
-        SyncManager: Sync manager instance
+        SyncManager: 同步管理器实例
     """
     return SyncManager(chroma_client)
