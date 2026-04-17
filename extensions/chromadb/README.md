@@ -17,6 +17,8 @@
 ```bash
 cd /workspace/backend
 uv add chromadb>=0.5.0
+# 安装 SQL Server 驱动依赖（用于字典数据同步）
+uv add pyodbc
 ```
 
 ### 方式 2：从本地目录安装（开发模式）
@@ -24,6 +26,8 @@ uv add chromadb>=0.5.0
 ```bash
 cd /workspace/extensions/chromadb
 uv pip install -e .
+# 安装 SQL Server 驱动依赖（用于字典数据同步）
+uv pip install pyodbc
 ```
 
 ### 方式 3：使用 uv pip 直接安装
@@ -31,6 +35,8 @@ uv pip install -e .
 ```bash
 cd /workspace/backend
 uv pip install chromadb>=0.5.0
+# 安装 SQL Server 驱动依赖（用于字典数据同步）
+uv pip install pyodbc
 ```
 
 ## 配置使用
@@ -214,6 +220,87 @@ PYTHONPATH=$(pwd) uv run python -m deerflow_chromadb.example_usage
 ```
 
 **注意：** ChromaDB 会在首次运行时下载 ONNX 模型（约 80MB），这可能需要一些时间，取决于网络连接速度。
+
+### SQL Server 字典数据同步
+
+从 SQL Server 2019 同步字典数据到 ChromaDB，并实现定时自动更新：
+
+#### 1. 安装 ODBC 驱动（Linux 系统）
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y unixodbc unixodbc-dev msodbcsql17
+
+# CentOS/RHEL
+sudo yum install -y unixODBC unixODBC-devel
+sudo curl https://packages.microsoft.com/config/rhel/7/prod.repo > /etc/yum.repos.d/mssql-release.repo
+sudo yum install -y msodbcsql17
+```
+
+#### 2. 配置环境变量
+
+```bash
+# SQL Server 连接信息
+export SQL_SERVER_SERVER="your_server_name"
+export SQL_SERVER_DATABASE="your_database_name"
+export SQL_SERVER_USER="your_username"
+export SQL_SERVER_PASSWORD="your_password"
+```
+
+#### 3. 运行同步示例
+
+```bash
+cd /workspace/backend
+uv run python sql_server_sync_example.py
+```
+
+#### 4. 代码示例
+
+```python
+from deerflow_chromadb import get_sync_manager
+import chromadb
+
+# 初始化 ChromaDB 客户端
+chroma_client = chromadb.Client()
+
+# 创建同步管理器
+sync_manager = get_sync_manager(chroma_client)
+
+# 配置同步
+# 定义要同步的字典表
+ tables_config = [
+    {
+        "table_name": "dbo.dictionary_terms",
+        "term_column": "term",
+        "definition_column": "definition",
+        "category_column": "category",
+        "example_column": "examples"
+    }
+]
+
+# 配置同步（使用环境变量连接）
+sync_manager.configure_sync(
+    tables_config=tables_config,
+    interval_seconds=3600  # 1小时同步一次
+)
+
+# 启动同步服务
+sync_manager.start_sync()
+
+# 手动触发同步
+sync_manager.sync_now()
+
+# 停止同步服务
+# sync_manager.stop_sync()
+```
+
+#### 5. 自定义同步配置
+
+- **同步间隔**：通过 `interval_seconds` 参数设置，默认 3600 秒（1小时）
+- **连接方式**：支持环境变量或直接传入连接字符串
+- **多表同步**：可配置多个字典表同时同步
+- **命名空间**：同步的数据会存储在 `sql_server_dictionary` 命名空间中
 
 ## 目录结构
 
