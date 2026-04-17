@@ -35,7 +35,7 @@ class ChromaMemoryStorage(MemoryStorage):
         except ImportError:
             raise ImportError(
                 "ChromaDB is not installed. "
-                "Install it with: uv pip install 'deerflow-harness[chromadb]'"
+                "Install it with: uv pip install chromadb>=0.5.0"
             )
 
         self._client = None

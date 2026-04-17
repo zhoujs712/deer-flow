@@ -1,6 +1,6 @@
 # ChromaDB Memory Storage for DeerFlow
 
-这是 DeerFlow 的 ChromaDB 内存存储集成，完全不修改核心代码。
+这是 DeerFlow 的 ChromaDB 内存存储集成，完全独立于核心代码。
 
 ## 功能特性
 
@@ -10,18 +10,19 @@
 - 内置语义搜索功能
 - 零核心代码修改
 
-## 安装依赖
+## 安装方式
+
+### 方式 1：从本地目录安装
 
 ```bash
-cd backend
-uv pip install 'deerflow-harness[chromadb]'
+cd /workspace/extensions/chromadb
+pip install -e .
 ```
 
-或者直接安装：
+### 方式 2：直接安装 ChromaDB
 
 ```bash
-cd backend
-uv pip install chromadb>=0.5.0
+pip install chromadb>=0.5.0
 ```
 
 ## 配置使用
@@ -33,7 +34,7 @@ uv pip install chromadb>=0.5.0
 ```yaml
 memory:
   enabled: true
-  storage_class: deerflow.community.chromadb:ChromaMemoryStorage
+  storage_class: chromadb.storage:ChromaMemoryStorage
   # 其他原有配置保持不变
   debounce_seconds: 30
   model_name: null
@@ -83,7 +84,7 @@ chroma run --host localhost --port 8000 --path ./chroma_data
 `ChromaMemoryStorage` 提供了额外的语义搜索功能：
 
 ```python
-from deerflow.community.chromadb import ChromaMemoryStorage
+from chromadb import ChromaMemoryStorage
 
 storage = ChromaMemoryStorage()
 
@@ -97,13 +98,15 @@ facts = storage.search_facts(
 print(f"找到 {len(facts)} 条相关事实")
 ```
 
-## 文件结构
+## 目录结构
 
 ```
-backend/packages/harness/deerflow/community/chromadb/
-├── __init__.py          # 模块入口
-├── storage.py           # ChromaMemoryStorage 实现
-└── README.md            # 本文档
+extensions/chromadb/
+├── deerflow_chromadb/        # 包目录
+│   ├── __init__.py          # 模块入口
+│   └── storage.py           # ChromaMemoryStorage 实现
+├── setup.py                 # 安装配置
+└── README.md                # 本文档
 ```
 
 ## 工作原理
@@ -124,8 +127,8 @@ backend/packages/harness/deerflow/community/chromadb/
 从 FileMemoryStorage 迁移到 ChromaDB：
 
 ```python
-from deerflow.agents.memory.storage import FileMemoryStorage, get_memory_storage
-from deerflow.community.chromadb import ChromaMemoryStorage
+from deerflow.agents.memory.storage import FileMemoryStorage
+from deerflow_chromadb import ChromaMemoryStorage
 
 # 加载原有数据
 old_storage = FileMemoryStorage()
@@ -138,12 +141,19 @@ new_storage.save(memory_data)
 
 ## 故障排查
 
+### ImportError: No module named 'deerflow_chromadb'
+
+解决：安装扩展
+```bash
+cd /workspace/extensions/chromadb
+pip install -e .
+```
+
 ### ImportError: No module named 'chromadb'
 
-解决：安装依赖
+解决：安装 ChromaDB
 ```bash
-cd backend
-uv pip install chromadb>=0.5.0
+pip install chromadb>=0.5.0
 ```
 
 ### 连接远程 ChromaDB 失败
@@ -161,7 +171,7 @@ uv pip install chromadb>=0.5.0
 
 ## 注意事项
 
-1. **不修改核心代码**：本集成完全基于 DeerFlow 现有的扩展机制，无需修改任何核心文件
+1. **独立于核心代码**：本扩展完全独立，无需修改任何核心文件
 2. **向后兼容**：可以随时切换回 FileMemoryStorage
 3. **性能考虑**：对于大量数据，建议使用远程 ChromaDB 服务器
 4. **备份**：定期备份 ChromaDB 数据目录
